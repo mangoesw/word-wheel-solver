@@ -17,6 +17,20 @@
           pipewire
         ];
 
+        compileroptions = "-std=c++20 -Wall -Wextra -pedantic";
+
+        pkgconfig = ''
+          mapfile -t packages < <(pkg-config --list-all | awk '{print $1}')
+
+            all_pkgconfig=""
+            for pkg in "''${packages[@]}"; do
+              pkgconfig=$(pkg-config --cflags --libs "$pkg")
+              all_pkgconfig+="''${pkgconfig} "
+            done
+            
+            all_pkgconfig="''${all_pkgconfig%" "}"
+        '';
+
         appName = "solveww";
       in
       {
@@ -39,20 +53,11 @@
             fi
 
             printf '  %s\n' "''${CPP_FILES[@]}"
-            
-            mapfile -t packages < <(pkg-config --list-all | awk '{print $1}')
 
-            all_pkgconfig=""
-            for pkg in "''${packages[@]}"; do
-              pkgconfig=$(pkg-config --cflags --libs "$pkg")
-              all_pkgconfig+="''${pkgconfig} "
-            done
-            
-            all_pkgconfig="''${all_pkgconfig%" "}"
-            echo "$all_pkgconfig"
+            ${pkgconfig}
 
             $CXX \
-              -std=c++20 -Wall -Wextra -pedantic \
+              ${compileroptions} \
               "''${CPP_FILES[@]}" \
               $all_pkgconfig \
               -o ${appName}
@@ -81,7 +86,15 @@
           packages = with pkgs; [
             gdb
             clang-tools
+            pkg-config
           ] ++ deps;
+          shellHook = ''
+            PS1='\[\e[38;5;32;1m\][flake]\$ \[\e[0m\]'
+            ${pkgconfig}
+            pkg-config --list-all
+            echo "$all_pkgconfig" | tr ' ' '\n' > "compile_flags.txt"
+            echo ${compileroptions} | tr ' ' '\n' >> "compile_flags.txt"
+          '';
         };
       });
 }
