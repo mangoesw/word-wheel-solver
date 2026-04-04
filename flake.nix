@@ -12,24 +12,11 @@
         pkgs = import nixpkgs { inherit system; };
         lib = pkgs.lib;
 
-        deps = with pkgs; [
-          dbus
-          pipewire
-        ];
+        compileroptions = "-std=c++20 -Wall -Wextra -Wpedantic -Werror";
 
-        compileroptions = "-std=c++20 -Wall -Wextra -pedantic";
-
-        pkgconfig = ''
-          mapfile -t packages < <(pkg-config --list-all | awk '{print $1}')
-
-            all_pkgconfig=""
-            for pkg in "''${packages[@]}"; do
-              pkgconfig=$(pkg-config --cflags --libs "$pkg")
-              all_pkgconfig+="''${pkgconfig} "
-            done
-            
-            all_pkgconfig="''${all_pkgconfig%" "}"
-        '';
+        deps = "dbus-1 libpipewire-0.3 wayland-client";
+        cflags = "$(pkg-config --cflags ${deps} | sed -E 's/(^| )-I/\\1 -isystem/g')";
+        libs = "$(pkg-config --libs ${deps})";
 
         appName = "solveww";
       in
@@ -39,8 +26,17 @@
           version = "0.1.0";
           src = lib.cleanSource ./.;
 
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = deps;
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+            wayland-scanner
+          ];
+          
+          buildInputs = with pkgs; [
+            dbus
+            pipewire
+            wayland
+            wayland-protocols
+          ];
 
           buildPhase = ''
             runHook preBuild
@@ -54,12 +50,10 @@
 
             printf '  %s\n' "''${CPP_FILES[@]}"
 
-            ${pkgconfig}
-
             $CXX \
               ${compileroptions} \
               "''${CPP_FILES[@]}" \
-              $all_pkgconfig \
+              ${cflags} ${libs} \
               -o ${appName}
 
             runHook postBuild
@@ -86,13 +80,14 @@
           packages = with pkgs; [
             gdb
             clang-tools
-            pkg-config
-          ] ++ deps;
+          ];
+
+          inputsFrom = [ self.packages.${system}.default ];
+
           shellHook = ''
             PS1='\[\e[38;5;32;1m\][flake]\$ \[\e[0m\]'
-            ${pkgconfig}
             pkg-config --list-all
-            echo "$all_pkgconfig" | tr ' ' '\n' > "compile_flags.txt"
+            echo ${cflags} | tr ' ' '\n' > "compile_flags.txt"
             echo ${compileroptions} | tr ' ' '\n' >> "compile_flags.txt"
           '';
         };
