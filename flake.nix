@@ -14,6 +14,11 @@
 
         compileroptions = "-std=c++20 -Wall -Wextra -Wpedantic -Werror";
 
+        WAYLAND_PROTOCOLS_DIR = "$(pkg-config wayland-protocols --variable=pkgdatadir)";
+        XDG_SHELL_PROTOCOL = "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml";
+        xdg_h = "wayland-scanner client-header ${XDG_SHELL_PROTOCOL} xdg-shell-client-protocol.h";
+        xdg_c = "wayland-scanner private-code ${XDG_SHELL_PROTOCOL} xdg-shell-protocol.c";
+
         deps = "dbus-1 libpipewire-0.3 wayland-client";
         cflags = "$(pkg-config --cflags ${deps} | sed -E 's/(^| )-I/\\1 -isystem/g')";
         libs = "$(pkg-config --libs ${deps})";
@@ -41,10 +46,13 @@
           buildPhase = ''
             runHook preBuild
 
-            mapfile -t CPP_FILES < <(find . -type f -name '*.cpp' | sort)
+            ${xdg_c}
+            ${xdg_h}
+
+            mapfile -t CPP_FILES < <(find . -type f -name '*.cpp' -o -name "*.c" | sort)
 
             if [ "''${#CPP_FILES[@]}" -eq 0 ]; then
-              echo "No .cpp files found."
+              echo "No source files found."
               exit 1
             fi
 
@@ -85,6 +93,7 @@
           inputsFrom = [ self.packages.${system}.default ];
 
           shellHook = ''
+            ${xdg_h}
             PS1='\[\e[38;5;32;1m\][flake]\$ \[\e[0m\]'
             pkg-config --list-all
             echo ${cflags} | tr ' ' '\n' > "compile_flags.txt"
