@@ -49,7 +49,9 @@
             ${xdg_c}
             ${xdg_h}
 
-            mapfile -t CPP_FILES < <(find . -type f -name '*.cpp' -o -name "*.c" | sort)
+            $CXX -c ${compileroptions} -w xdg-shell-protocol.c
+
+            mapfile -t CPP_FILES < <(find . -type f -name '*.cpp' | sort)
 
             if [ "''${#CPP_FILES[@]}" -eq 0 ]; then
               echo "No source files found."
@@ -59,9 +61,16 @@
             printf '  %s\n' "''${CPP_FILES[@]}"
 
             $CXX \
+              -c \
               ${compileroptions} \
               "''${CPP_FILES[@]}" \
-              ${cflags} ${libs} \
+              ${cflags}
+
+            mapfile -t O_FILES < <(find . -type f -name '*.o' | sort)
+            $CXX \
+              ${compileroptions} \
+              "''${O_FILES[@]}" \
+              ${libs} \
               -o ${appName}
 
             runHook postBuild
